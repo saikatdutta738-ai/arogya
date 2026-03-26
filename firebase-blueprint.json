@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user demographic and role information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique ID of the user." },
+        "name": { "type": "string", "description": "Full name of the user." },
+        "email": { "type": "string", "format": "email", "description": "User's email address." },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "User's role in the system." },
+        "age": { "type": "integer", "description": "User's age." },
+        "gender": { "type": "string", "description": "User's gender." },
+        "bloodGroup": { "type": "string", "description": "User's blood group." },
+        "height": { "type": "string", "description": "User's height." },
+        "weight": { "type": "string", "description": "User's weight." },
+        "emergencyContact": { "type": "string", "description": "Emergency contact number." },
+        "avatar": { "type": "string", "description": "URL to the user's avatar image." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "HealthMetric": {
+      "title": "Health Metric",
+      "description": "A single health data point for a user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The ID of the user this metric belongs to." },
+        "type": { "type": "string", "enum": ["steps", "water", "heartRate", "sleep", "calories"], "description": "The type of metric." },
+        "value": { "type": "number", "description": "The numeric value of the metric." },
+        "unit": { "type": "string", "description": "The unit of measurement." },
+        "timestamp": { "type": "integer", "description": "Unix timestamp of the metric." }
+      },
+      "required": ["uid", "type", "value", "timestamp"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A medical appointment for a user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The ID of the user this appointment belongs to." },
+        "doctorId": { "type": "integer", "description": "The ID of the doctor." },
+        "doctorName": { "type": "string", "description": "The name of the doctor." },
+        "date": { "type": "string", "description": "The date of the appointment." },
+        "time": { "type": "string", "description": "The time of the appointment." },
+        "type": { "type": "string", "enum": ["virtual", "in-person"], "description": "The type of appointment." },
+        "status": { "type": "string", "enum": ["upcoming", "completed", "cancelled"], "description": "The status of the appointment." }
+      },
+      "required": ["uid", "doctorId", "date", "time", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile data."
+    },
+    "/metrics/{metricId}": {
+      "schema": "HealthMetric",
+      "description": "Health metrics for all users."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Appointments for all users."
+    }
+  }
+}

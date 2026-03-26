@@ -1,0 +1,135 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Document ID: userId (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required) - The unique ID of the user.
+    //   - name: string (required) - Full name of the user.
+    //   - email: string (required) - User's email address.
+    //   - role: string (required) - User's role ('admin' or 'user').
+    //   - age: number (optional) - User's age.
+    //   - gender: string (optional) - User's gender.
+    //   - bloodGroup: string (optional) - User's blood group.
+    //   - height: string (optional) - User's height.
+    //   - weight: string (optional) - User's weight.
+    //   - emergencyContact: string (optional) - Emergency contact number.
+    //   - avatar: string (optional) - URL to the user's avatar image.
+    //   - createdAt: timestamp (optional) - When the profile was created.
+    //
+    // Collection: /metrics/{metricId}
+    // Document ID: metricId (Auto-generated)
+    // Fields:
+    //   - uid: string (required) - The ID of the user this metric belongs to.
+    //   - type: string (required) - The type of metric ('steps', 'water', etc.).
+    //   - value: number (required) - The numeric value of the metric.
+    //   - unit: string (optional) - The unit of measurement.
+    //   - timestamp: number (required) - Unix timestamp of the metric.
+    //
+    // Collection: /appointments/{appointmentId}
+    // Document ID: appointmentId (Auto-generated)
+    // Fields:
+    //   - uid: string (required) - The ID of the user this appointment belongs to.
+    //   - doctorId: number (required) - The ID of the doctor.
+    //   - doctorName: string (optional) - The name of the doctor.
+    //   - date: string (required) - The date of the appointment.
+    //   - time: string (required) - The time of the appointment.
+    //   - type: string (optional) - The type of appointment ('virtual', 'in-person').
+    //   - status: string (required) - The status of the appointment.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "saikatdutta738@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'name', 'email', 'role']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'user'];
+    }
+
+    function isValidMetric(data) {
+      return hasRequiredFields(['uid', 'type', 'value', 'timestamp']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.type in ['steps', 'water', 'heartRate', 'sleep', 'calories'] &&
+             data.value is number &&
+             data.timestamp is number;
+    }
+
+    function isValidAppointment(data) {
+      return hasRequiredFields(['uid', 'doctorId', 'date', 'time', 'status']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.doctorId is number &&
+             data.date is string &&
+             data.time is string &&
+             data.status in ['upcoming', 'completed', 'cancelled'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /metrics/{metricId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid && isValidMetric(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid && isValidMetric(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid && isValidAppointment(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidAppointment(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
