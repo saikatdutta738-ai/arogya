@@ -3,9 +3,8 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { NeonButton } from '../components/UI';
-import { ChevronRight, Check, User, Droplet, Ruler, Weight, Phone, LogIn } from 'lucide-react';
+import { ChevronRight, Check, User, LogIn } from 'lucide-react';
 import { db as localDb, runDb } from '../db';
-import { auth, signInWithGoogle, db as firestoreDb, doc, setDoc, handleFirestoreError, OperationType } from '../firebase';
 
 const slides = [
   {
@@ -31,7 +30,6 @@ const slides = [
 export const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const [current, setCurrent] = useState(0);
   const [showProfileForm, setShowProfileForm] = useState(false);
-  const [isSigningIn, setIsSigningIn] = useState(false);
   const [profile, setProfile] = useState({
     name: '',
     age: 25,
@@ -46,48 +44,14 @@ export const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete })
   });
   const navigate = useNavigate();
 
-  const handleGoogleSignIn = async () => {
-    setIsSigningIn(true);
-    try {
-      const result = await signInWithGoogle();
-      if (result.user) {
-        setProfile(prev => ({
-          ...prev,
-          name: result.user.displayName || '',
-          avatar: result.user.photoURL || prev.avatar
-        }));
-        setShowProfileForm(true);
-      }
-    } catch (error) {
-      console.error('Sign in failed:', error);
-    } finally {
-      setIsSigningIn(false);
-    }
-  };
-
   const handleComplete = async () => {
     if (!profile.name) {
       alert('Please enter your name');
       return;
     }
 
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const role = user.email === 'saikatdutta738@gmail.com' ? 'admin' : 'user';
-    const firestoreProfile = {
-      ...profile,
-      uid: user.uid,
-      email: user.email,
-      role,
-      createdAt: new Date().toISOString()
-    };
-
     try {
-      // Save to Firestore
-      await setDoc(doc(firestoreDb, 'users', user.uid), firestoreProfile);
-      
-      // Save to Local DB for offline/legacy support
+      // Save to Local DB
       await runDb(async () => {
         await localDb.userProfile.clear();
         await localDb.userProfile.add(profile);
@@ -97,7 +61,8 @@ export const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete })
       onComplete();
       navigate('/');
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}`);
+      console.error('Failed to save profile:', error);
+      alert('Failed to save profile. Please try again.');
     }
   };
 
@@ -105,7 +70,7 @@ export const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete })
     if (current < slides.length - 1) {
       setCurrent(current + 1);
     } else {
-      handleGoogleSignIn();
+      setShowProfileForm(true);
     }
   };
 
@@ -177,19 +142,6 @@ export const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete })
 
   return (
     <div className="relative min-h-screen w-full overflow-y-auto md:overflow-hidden bg-slate-950 flex flex-col md:flex-row">
-      {/* Top Right Sign In Button */}
-      <div className="absolute top-6 right-6 z-20">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handleGoogleSignIn}
-          disabled={isSigningIn}
-          className="px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold uppercase tracking-widest hover:bg-white/20 transition-all"
-        >
-          {isSigningIn ? '...' : 'Sign In'}
-        </motion.button>
-      </div>
-
       <motion.div
         key={current}
         initial={{ opacity: 0 }}
@@ -248,19 +200,10 @@ export const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete })
         </motion.p>
 
         <div className="flex items-center justify-between gap-4">
-          <NeonButton onClick={next} className="flex-1 md:flex-none md:w-64 h-14" disabled={isSigningIn}>
-            {isSigningIn ? 'Signing in...' : current === slides.length - 1 ? 'Get Started' : 'Next'}
-            {current === slides.length - 1 ? <LogIn size={20} /> : <ChevronRight size={20} />}
+          <NeonButton onClick={next} className="flex-1 md:flex-none md:w-64 h-14">
+            {current === slides.length - 1 ? 'Get Started' : 'Next'}
+            {current === slides.length - 1 ? <Check size={20} /> : <ChevronRight size={20} />}
           </NeonButton>
-
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={handleGoogleSignIn}
-            disabled={isSigningIn}
-            className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0"
-          >
-            <LogIn size={24} className="text-accent" />
-          </motion.button>
         </div>
       </div>
     </div>

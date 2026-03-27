@@ -182,7 +182,9 @@ const EditProfileModal = ({ user, onClose, onUpdate }: { user: any, onClose: () 
     height: user?.height || '',
     weight: user?.weight || '',
     emergencyContact: user?.emergencyContact || '',
-    avatar: user?.avatar || ''
+    avatar: user?.avatar || '',
+    allergies: user?.allergies?.join(', ') || '',
+    conditions: user?.conditions?.join(', ') || ''
   });
 
   const avatars = [
@@ -197,10 +199,15 @@ const EditProfileModal = ({ user, onClose, onUpdate }: { user: any, onClose: () 
   const handleSave = async () => {
     try {
       const localUser = await localDb.userProfile.toCollection().first();
+      const updatedData = {
+        ...formData,
+        allergies: formData.allergies.split(',').map(item => item.trim()).filter(item => item !== ''),
+        conditions: formData.conditions.split(',').map(item => item.trim()).filter(item => item !== '')
+      };
       if (localUser?.id) {
-        await runDb(() => localDb.userProfile.update(localUser.id!, formData));
+        await runDb(() => localDb.userProfile.update(localUser.id!, updatedData));
       } else {
-        await runDb(() => localDb.userProfile.add(formData as any));
+        await runDb(() => localDb.userProfile.add(updatedData as any));
       }
       onUpdate();
       onClose();
@@ -299,6 +306,24 @@ const EditProfileModal = ({ user, onClose, onUpdate }: { user: any, onClose: () 
                 type="text" 
                 value={formData.weight}
                 onChange={(e) => setFormData({...formData, weight: e.target.value})}
+                className="w-full h-14 glass-card px-4 outline-none focus:border-accent/50 transition-colors text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-white/40 tracking-widest">Allergies (comma separated)</label>
+              <input 
+                type="text" 
+                value={formData.allergies}
+                onChange={(e) => setFormData({...formData, allergies: e.target.value})}
+                className="w-full h-14 glass-card px-4 outline-none focus:border-accent/50 transition-colors text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-white/40 tracking-widest">Conditions (comma separated)</label>
+              <input 
+                type="text" 
+                value={formData.conditions}
+                onChange={(e) => setFormData({...formData, conditions: e.target.value})}
                 className="w-full h-14 glass-card px-4 outline-none focus:border-accent/50 transition-colors text-white"
               />
             </div>

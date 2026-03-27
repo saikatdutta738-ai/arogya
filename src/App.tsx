@@ -11,7 +11,6 @@ import { AdminDashboard } from './screens/AdminDashboard';
 import { BottomNav } from './components/BottomNav';
 import { Footer } from './components/Footer';
 import { seedDatabase, db as localDb, runDb } from './db';
-import { auth, db as firestoreDb, doc, getDoc, onAuthStateChanged } from './firebase';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AnimatePresence } from 'motion/react';
@@ -22,7 +21,7 @@ import { cn } from './lib/utils';
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(false);
-  const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
 
   useEffect(() => {
     const init = async () => {
@@ -32,35 +31,10 @@ export default function App() {
         console.error('Failed to seed database:', error);
       }
       
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          try {
-            const userDoc = await getDoc(doc(firestoreDb, 'users', user.uid));
-            if (userDoc.exists()) {
-              const data = userDoc.data();
-              setUserRole(data.role);
-              setOnboarded(true);
-              
-              // Sync to local DB for offline/dashboard support
-              await runDb(async () => {
-                await localDb.userProfile.clear();
-                await localDb.userProfile.add(data as any);
-              });
-            } else {
-              setOnboarded(false);
-            }
-          } catch (error) {
-            console.error('Error fetching user doc:', error);
-            setOnboarded(false);
-          }
-        } else {
-          setOnboarded(false);
-          setUserRole(null);
-        }
-        setLoading(false);
-      });
-
-      return () => unsubscribe();
+      const isOnboarded = localStorage.getItem('onboarded') === 'true';
+      setOnboarded(isOnboarded);
+      setUserRole('user');
+      setLoading(false);
     };
     init();
   }, []);
@@ -104,7 +78,7 @@ export default function App() {
   );
 }
 
-function Sidebar({ userRole }: { userRole: 'admin' | 'user' | null }) {
+function Sidebar({ userRole }: { userRole: 'admin' | 'user' }) {
   const localUser = useLiveQuery(() => localDb.userProfile.toCollection().first());
   const navItems = [
     { icon: Home, path: '/', label: 'Home' },
@@ -153,10 +127,10 @@ function Sidebar({ userRole }: { userRole: 'admin' | 'user' | null }) {
       <div className="mt-auto pt-6 border-t border-white/10">
         <div className="flex items-center gap-3 px-2">
           <div className="w-10 h-10 rounded-full border border-accent/50 p-0.5">
-            <img src={localUser?.avatar || auth.currentUser?.photoURL || undefined} className="w-full h-full rounded-full object-cover" alt="User" />
+            <img src={localUser?.avatar || undefined} className="w-full h-full rounded-full object-cover" alt="User" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold truncate">{localUser?.name || auth.currentUser?.displayName || 'User'}</p>
+            <p className="text-sm font-bold truncate">{localUser?.name || 'User'}</p>
             <p className="text-[10px] text-white/40 uppercase font-bold">{userRole === 'admin' ? 'Administrator' : 'Pro Member'}</p>
           </div>
         </div>
@@ -165,7 +139,7 @@ function Sidebar({ userRole }: { userRole: 'admin' | 'user' | null }) {
   );
 }
 
-function MainLayout({ userRole }: { userRole: 'admin' | 'user' | null }) {
+function MainLayout({ userRole }: { userRole: 'admin' | 'user' }) {
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <div className="flex-1">
